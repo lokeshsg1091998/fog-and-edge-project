@@ -1,0 +1,76 @@
+name: Military Sensor Dashboard CI/CD
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r dashboard/requirements.txt
+
+    - name: Run Tests
+      run: |
+        cd dashboard
+        python -c "from application import application; print('App imported OK')"
+        python -c "
+        import application as app
+        client = app.application.test_client()
+        r = client.get('/api/health')
+        assert r.status_code == 200
+        print('Health check passed')
+        "
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+        aws-region: us-east-1
+
+    - name: Create deployment package
+      run: |
+        cd dashboard
+        zip -r ../military-dashboard.zip . \
+          -x "*.git*" \
+          -x "__pycache__/*" \
+          -x "*.pyc"
+
+    - name: Upload to S3
+      run: |
+        aws s3 cp military-dashboard.zip \
+          s3://elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}/military-dashboard.zip
+
+    - name: Create new EB version
+      run: |
+        aws elasticbeanstalk create-application-version \
+          --application-name military-dashboard \
+          --version-label v-${{ github.run_number }} \
+          --source-bundle S3Bucket="elasticbeanstalk-us-east-1-${{ secrets.AWS_ACCOUNT_ID }}",S3Key="military-dashboard.zip"
+
+    - name: Deploy to Elastic Beanstalk
+      run: |
+        aws elasticbeanstalk update-environment \
+          --environment-name military-dashboard-env \
+          --version-label v-${{ github.run_number }}
