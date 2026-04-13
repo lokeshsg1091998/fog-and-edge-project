@@ -1,9 +1,3 @@
-"""
-application.py — Military Sensor Dashboard (Cloud Backend)
-Flask application deployed on AWS Elastic Beanstalk.
-Reads sensor data from DynamoDB and serves a real-time dashboard.
-"""
-
 import os
 import json
 from datetime import datetime, timezone, timedelta
@@ -14,7 +8,6 @@ from flask import Flask, render_template, jsonify, request
 
 application = Flask(__name__)
 
-# ─── DynamoDB Setup ───────────────────────────────────────────────
 AWS_REGION = os.environ.get("AWS_REGION", "us-east-1")
 TABLE_NAME = os.environ.get("DYNAMODB_TABLE", "MilitarySensorData")
 
@@ -23,29 +16,19 @@ table = dynamodb.Table(TABLE_NAME)
 
 
 def decimal_default(obj):
-    """JSON serialiser for Decimal types returned by DynamoDB."""
     if isinstance(obj, Decimal):
         f = float(obj)
         return int(f) if f == int(f) else f
     raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
 
-
-# ─── Routes ───────────────────────────────────────────────────────
-
 @application.route("/")
 def dashboard():
-    """Serve the main dashboard page."""
     return render_template("index.html")
 
 
 @application.route("/api/sensor-data")
 def get_sensor_data():
-    """
-    Fetch recent readings for a given sensor type.
-    Query params:
-      sensor_type — thermal | motion | gps | acoustic
-      limit       — number of records (default 30)
-    """
+
     sensor_type = request.args.get("sensor_type", "thermal")
     limit = int(request.args.get("limit", 30))
 
@@ -64,7 +47,6 @@ def get_sensor_data():
 
 @application.route("/api/latest")
 def get_latest():
-    """Fetch the most recent reading for each sensor type."""
     sensors = ["thermal", "motion", "gps", "acoustic"]
     latest = {}
 
@@ -85,10 +67,7 @@ def get_latest():
 
 @application.route("/api/health")
 def health():
-    """Health check endpoint for Elastic Beanstalk."""
     return jsonify({"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()})
 
-
-# ─── Run ──────────────────────────────────────────────────────────
 if __name__ == "__main__":
     application.run(host="0.0.0.0", port=8080, debug=True)
