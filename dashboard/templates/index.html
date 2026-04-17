@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Military Sensor Command Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0f0d;
+            --bg-secondary: #111a14;
+            --bg-card: #15201a;
+            --border: #2a3f30;
+            --accent: #3ddc84;
+            --accent-dim: #1b5e20;
+            --danger: #ff5252;
+            --warning: #ffc107;
+            --text: #c8e6c9;
+            --text-dim: #6b8f71;
+            --text-bright: #e8f5e9;
+        }
+
+        body {
+            font-family: 'Courier New', monospace;
+            background: var(--bg-primary);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #0d1a0f 0%, #1a2e1a 100%);
+            border-bottom: 2px solid var(--accent-dim);
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-left { display: flex; align-items: center; gap: 16px; }
+
+        .header-icon {
+            width: 40px; height: 40px;
+            border: 2px solid var(--accent);
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            color: var(--accent);
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .header-sub {
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 1px;
+        }
+
+        .status-bar {
+            display: flex; align-items: center; gap: 16px;
+            font-size: 12px;
+        }
+
+        .status-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+        }
+
+        .status-dot.live { background: var(--accent); animation: pulse 1.5s infinite; }
+        .status-dot.off  { background: var(--danger); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        .controls {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .btn {
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            padding: 6px 16px;
+            border: 1px solid var(--border);
+            background: var(--bg-card);
+            color: var(--text);
+            cursor: pointer;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .btn:hover { border-color: var(--accent); color: var(--accent); }
+        .btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+        .btn.danger { border-color: var(--danger); color: var(--danger); }
+        .btn.danger:hover { background: #2a0a0a; }
+
+        .control-group {
+            display: flex; align-items: center; gap: 8px;
+            font-size: 12px; color: var(--text-dim);
+        }
+
+        .separator {
+            width: 1px; height: 24px;
+            background: var(--border); margin: 0 8px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding: 20px 24px;
+        }
+
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 3px;
+            background: var(--accent);
+        }
+
+        .card.anomaly::before { background: var(--danger); }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .card-title {
+            font-size: 11px;
+            color: var(--text-dim);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
+
+        .card-badge {
+            font-size: 9px;
+            padding: 2px 8px;
+            border-radius: 2px;
+            letter-spacing: 1px;
+        }
+
+        .badge-ok { background: var(--accent-dim); color: var(--accent); }
+        .badge-alert { background: #4a1010; color: var(--danger); }
+
+        .card-value {
+            font-size: 28px;
+            color: var(--text-bright);
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+
+        .card-unit {
+            font-size: 14px;
+            color: var(--text-dim);
+        }
+
+        .card-detail {
+            font-size: 11px;
+            color: var(--text-dim);
+            margin-top: 8px;
+            line-height: 1.6;
+        }
+
+        .charts {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            padding: 0 24px 24px;
+        }
+
+        .chart-box {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+        }
+
+        .chart-title {
+            font-size: 12px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .chart-wrapper { position: relative; height: 220px; }
+
+        .log-panel {
+            margin: 0 24px 24px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            padding: 16px;
+        }
+
+        .log-title {
+            font-size: 12px;
+            color: var(--accent);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .log-entries {
+            max-height: 120px;
+            overflow-y: auto;
+            font-size: 11px;
+            line-height: 1.8;
+            color: var(--text-dim);
+        }
+
+        .log-entries .anomaly-log { color: var(--danger); }
+        .log-entries .info-log { color: var(--text); }
+
+        @media (max-width: 900px) {
+            .cards { grid-template-columns: repeat(2, 1fr); }
+            .charts { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="header-left">
+        <div class="header-icon">&#9881;</div>
+        <div>
+            <h1>Tactical Sensor Command</h1>
+            <div class="header-sub">FOG &amp; EDGE IoT SURVEILLANCE NETWORK</div>
+        </div>
+    </div>
+    <div class="status-bar">
+        <span><span class="status-dot live" id="statusDot"></span> <span id="statusText">LIVE</span></span>
+        <span style="color:var(--text-dim);" id="clockDisplay">--:--:--</span>
+    </div>
+</div>
+
+<div class="controls">
+    <div class="control-group">
+        <span>SYSTEM:</span>
+        <button class="btn active" id="btnStart" onclick="toggleSystem()">&#9654; RUNNING</button>
+    </div>
+    <div class="separator"></div>
+    <div class="control-group">
+        <span>SENSORS:</span>
+        <button class="btn active sensor-toggle" data-sensor="thermal" onclick="toggleSensor(this)">THERMAL</button>
+        <button class="btn active sensor-toggle" data-sensor="motion" onclick="toggleSensor(this)">MOTION</button>
+        <button class="btn active sensor-toggle" data-sensor="gps" onclick="toggleSensor(this)">GPS</button>
+        <button class="btn active sensor-toggle" data-sensor="acoustic" onclick="toggleSensor(this)">ACOUSTIC</button>
+    </div>
+    <div class="separator"></div>
+    <div class="control-group">
+        <span>REFRESH:</span>
+        <button class="btn active" id="btnRefresh" onclick="toggleRefresh()">10s AUTO</button>
+    </div>
+</div>
+
+<div class="cards">
+    <div class="card" id="cardThermal">
+        <div class="card-header">
+            <span class="card-title">&#127777; Thermal</span>
+            <span class="card-badge badge-ok" id="badgeThermal">NOMINAL</span>
+        </div>
+        <div class="card-value" id="valThermal">--</div>
+        <div class="card-unit">&deg;C</div>
+        <div class="card-detail" id="detailThermal">IR Intensity: -- | Heat Sig: --</div>
+    </div>
+
+    <div class="card" id="cardMotion">
+        <div class="card-header">
+            <span class="card-title">&#128694; Motion</span>
+            <span class="card-badge badge-ok" id="badgeMotion">CLEAR</span>
+        </div>
+        <div class="card-value" id="valMotion">--</div>
+        <div class="card-unit">m/s</div>
+        <div class="card-detail" id="detailMotion">Direction: -- | Threat: --</div>
+    </div>
+
+    <div class="card" id="cardGps">
+        <div class="card-header">
+            <span class="card-title">&#128225; GPS</span>
+            <span class="card-badge badge-ok" id="badgeGps">IN ZONE</span>
+        </div>
+        <div class="card-value" id="valGps">--</div>
+        <div class="card-unit">km/h</div>
+        <div class="card-detail" id="detailGps">Lat: -- | Lon: -- | Alt: --</div>
+    </div>
+
+    <div class="card" id="cardAcoustic">
+        <div class="card-header">
+            <span class="card-title">&#127908; Acoustic</span>
+            <span class="card-badge badge-ok" id="badgeAcoustic">QUIET</span>
+        </div>
+        <div class="card-value" id="valAcoustic">--</div>
+        <div class="card-unit">dB</div>
+        <div class="card-detail" id="detailAcoustic">Freq: -- Hz | Class: --</div>
+    </div>
+</div>
+
+<div class="charts">
+    <div class="chart-box">
+        <div class="chart-title">Thermal — Temperature &deg;C</div>
+        <div class="chart-wrapper"><canvas id="chartThermal"></canvas></div>
+    </div>
+    <div class="chart-box">
+        <div class="chart-title">Motion — Velocity m/s</div>
+        <div class="chart-wrapper"><canvas id="chartMotion"></canvas></div>
+    </div>
+    <div class="chart-box">
+        <div class="chart-title">GPS — Speed km/h</div>
+        <div class="chart-wrapper"><canvas id="chartGps"></canvas></div>
+    </div>
+    <div class="chart-box">
+        <div class="chart-title">Acoustic — Decibel Level dB</div>
+        <div class="chart-wrapper"><canvas id="chartAcoustic"></canvas></div>
+    </div>
+</div>
+
+<div class="log-panel">
+    <div class="log-title">&#128196; Event Log</div>
+    <div class="log-entries" id="logEntries">
+        <div class="info-log">[--:--:--] System initialising...</div>
+    </div>
+</div>
+
+<script>
+    let systemRunning = true;
+    let autoRefresh = true;
+    let refreshTimer = null;
+    const REFRESH_MS = 10000;
+    const MAX_POINTS = 30;
+    const enabledSensors = { thermal: true, motion: true, gps: true, acoustic: true };
+
+    const chartOpts = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+            legend: { display: false },
+        },
+        scales: {
+            x: {
+                ticks: { color: '#6b8f71', font: { family: 'Courier New', size: 9 }, maxTicksLimit: 8 },
+                grid: { color: '#1a2e1a' },
+            },
+            y: {
+                ticks: { color: '#6b8f71', font: { family: 'Courier New', size: 10 } },
+                grid: { color: '#1a2e1a' },
+            },
+        },
+    };
+
+    function makeChart(id, label, color) {
+        return new Chart(document.getElementById(id), {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: label,
+                    data: [],
+                    borderColor: color,
+                    backgroundColor: color + '22',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 2,
+                    pointBackgroundColor: color,
+                    borderWidth: 1.5,
+                }],
+            },
+            options: chartOpts,
+        });
+    }
+
+    const charts = {
+        thermal:  makeChart('chartThermal',  'Temp',     '#3ddc84'),
+        motion:   makeChart('chartMotion',   'Velocity', '#ffc107'),
+        gps:      makeChart('chartGps',      'Speed',    '#42a5f5'),
+        acoustic: makeChart('chartAcoustic', 'Decibels', '#ff5252'),
+    };
+
+    setInterval(() => {
+        document.getElementById('clockDisplay').textContent =
+            new Date().toISOString().slice(11, 19) + ' UTC';
+    }, 1000);
+
+    function toggleSystem() {
+        systemRunning = !systemRunning;
+        const btn = document.getElementById('btnStart');
+        const dot = document.getElementById('statusDot');
+        const txt = document.getElementById('statusText');
+        if (systemRunning) {
+            btn.classList.add('active');
+            btn.innerHTML = '&#9654; RUNNING';
+            dot.className = 'status-dot live';
+            txt.textContent = 'LIVE';
+            startAutoRefresh();
+            addLog('System resumed', false);
+        } else {
+            btn.classList.remove('active');
+            btn.innerHTML = '&#9724; STOPPED';
+            dot.className = 'status-dot off';
+            txt.textContent = 'STOPPED';
+            stopAutoRefresh();
+            addLog('System paused', false);
+        }
+    }
+
+    function toggleSensor(el) {
+        const sensor = el.dataset.sensor;
+        enabledSensors[sensor] = !enabledSensors[sensor];
+        el.classList.toggle('active');
+        addLog(sensor.toUpperCase() + (enabledSensors[sensor] ? ' enabled' : ' disabled'), false);
+    }
+
+    function toggleRefresh() {
+        autoRefresh = !autoRefresh;
+        const btn = document.getElementById('btnRefresh');
+        if (autoRefresh) {
+            btn.classList.add('active');
+            btn.textContent = '10s AUTO';
+            startAutoRefresh();
+        } else {
+            btn.classList.remove('active');
+            btn.textContent = 'MANUAL';
+            stopAutoRefresh();
+        }
+    }
+
+    function startAutoRefresh() {
+        stopAutoRefresh();
+        if (systemRunning && autoRefresh) {
+            refreshTimer = setInterval(fetchAll, REFRESH_MS);
+        }
+    }
+
+    function stopAutoRefresh() {
+        if (refreshTimer) { clearInterval(refreshTimer); refreshTimer = null; }
+    }
+
+    function addLog(msg, isAnomaly) {
+        const el = document.getElementById('logEntries');
+        const ts = new Date().toISOString().slice(11, 19);
+        const cls = isAnomaly ? 'anomaly-log' : 'info-log';
+        const prefix = isAnomaly ? '&#9888; ' : '';
+        el.innerHTML = `<div class="${cls}">[${ts}] ${prefix}${msg}</div>` + el.innerHTML;
+        if (el.children.length > 50) el.removeChild(el.lastChild);
+    }
+
+    function fmtTime(ts) {
+        if (!ts) return '--';
+        return ts.slice(11, 19);
+    }
+
+    function updateCard(sensor, item) {
+        if (!item || !item.edge_data) return;
+        const ed = item.edge_data;
+        const anom = item.anomaly;
+
+        if (sensor === 'thermal') {
+            document.getElementById('valThermal').textContent =
+                (ed.smoothed_temperature_c ?? ed.raw_temperature_c ?? '--').toString();
+            document.getElementById('detailThermal').textContent =
+                `IR: ${ed.smoothed_ir_intensity ?? '--'} | Heat Sig: ${ed.heat_signature ? 'YES' : 'NO'}`;
+            const badge = document.getElementById('badgeThermal');
+            const card = document.getElementById('cardThermal');
+            if (anom) { badge.textContent = 'ALERT'; badge.className = 'card-badge badge-alert'; card.classList.add('anomaly'); }
+            else { badge.textContent = 'NOMINAL'; badge.className = 'card-badge badge-ok'; card.classList.remove('anomaly'); }
+        }
+
+        if (sensor === 'motion') {
+            document.getElementById('valMotion').textContent = (ed.velocity_ms ?? '--').toString();
+            document.getElementById('detailMotion').textContent =
+                `Dir: ${ed.direction_deg ?? '--'}° | Threat: ${ed.threat_level ?? '--'}`;
+            const badge = document.getElementById('badgeMotion');
+            const card = document.getElementById('cardMotion');
+            if (anom) { badge.textContent = 'THREAT'; badge.className = 'card-badge badge-alert'; card.classList.add('anomaly'); }
+            else { badge.textContent = 'CLEAR'; badge.className = 'card-badge badge-ok'; card.classList.remove('anomaly'); }
+        }
+
+        if (sensor === 'gps') {
+            document.getElementById('valGps').textContent = (ed.speed_kmh ?? '--').toString();
+            document.getElementById('detailGps').textContent =
+                `Lat: ${(ed.latitude ?? 0).toFixed(4)} | Lon: ${(ed.longitude ?? 0).toFixed(4)} | Alt: ${ed.altitude_m ?? '--'}m`;
+            const badge = document.getElementById('badgeGps');
+            const card = document.getElementById('cardGps');
+            if (anom) { badge.textContent = 'OUT ZONE'; badge.className = 'card-badge badge-alert'; card.classList.add('anomaly'); }
+            else { badge.textContent = 'IN ZONE'; badge.className = 'card-badge badge-ok'; card.classList.remove('anomaly'); }
+        }
+
+        if (sensor === 'acoustic') {
+            document.getElementById('valAcoustic').textContent =
+                (ed.smoothed_decibel_level ?? ed.raw_decibel_level ?? '--').toString();
+            document.getElementById('detailAcoustic').textContent =
+                `Freq: ${ed.frequency_hz ?? '--'} Hz | Class: ${(ed.classification ?? '--').toUpperCase()}`;
+            const badge = document.getElementById('badgeAcoustic');
+            const card = document.getElementById('cardAcoustic');
+            if (anom) { badge.textContent = 'THREAT'; badge.className = 'card-badge badge-alert'; card.classList.add('anomaly'); }
+            else { badge.textContent = 'QUIET'; badge.className = 'card-badge badge-ok'; card.classList.remove('anomaly'); }
+        }
+
+        if (anom) {
+            addLog(`${sensor.toUpperCase()}: ${ed.anomaly_reason || 'Anomaly detected'}`, true);
+        }
+    }
+
+    function updateChart(sensor, items) {
+        const chart = charts[sensor];
+        if (!chart || !items) return;
+
+        const labels = [];
+        const values = [];
+
+        const valueKey = {
+            thermal: (d) => d.edge_data?.smoothed_temperature_c ?? d.edge_data?.raw_temperature_c,
+            motion:  (d) => d.edge_data?.velocity_ms,
+            gps:     (d) => d.edge_data?.speed_kmh,
+            acoustic:(d) => d.edge_data?.smoothed_decibel_level ?? d.edge_data?.raw_decibel_level,
+        };
+
+        items.forEach(item => {
+            labels.push(fmtTime(item.timestamp));
+            values.push(valueKey[sensor](item) ?? 0);
+        });
+
+        chart.data.labels = labels;
+        chart.data.datasets[0].data = values;
+        chart.update('none');
+    }
+
+    async function fetchSensor(sensor) {
+        if (!enabledSensors[sensor]) return;
+        try {
+            const resp = await fetch(`https://o34gmgxw3i.execute-api.us-east-1.amazonaws.com/production/sensor-data?sensor_type=${sensor}&limit=${MAX_POINTS}`);
+            const json = await resp.json();
+            if (json.data && json.data.length > 0) {
+                updateCard(sensor, json.data[json.data.length - 1]);
+                updateChart(sensor, json.data);
+            }
+        } catch (e) {
+            console.error(`Fetch ${sensor} failed:`, e);
+        }
+    }
+
+    async function fetchAll() {
+        if (!systemRunning) return;
+        await Promise.all([
+            fetchSensor('thermal'),
+            fetchSensor('motion'),
+            fetchSensor('gps'),
+            fetchSensor('acoustic'),
+        ]);
+    }
+
+    addLog('Dashboard connected', false);
+    fetchAll();
+    startAutoRefresh();
+</script>
+</body>
+</html>
